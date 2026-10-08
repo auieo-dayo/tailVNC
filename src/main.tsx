@@ -24,6 +24,15 @@ import "./style.css";
 import { createTailnetClient, type TailnetPeer, type TailnetState } from "./lib/tailscale";
 import { TailscaleVncChannel } from "./lib/tailscale-vnc-channel";
 
+function registerServiceWorker() {
+  if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+      console.warn("TailVNC offline shell registration failed", error);
+    });
+  }, { once: true });
+}
+
 function App() {
   const [tailnetState, setTailnetState] = useState<TailnetState>("Starting");
   const [peers, setPeers] = useState<TailnetPeer[]>([]);
@@ -417,3 +426,4 @@ function LockKeyholeIcon() {
 }
 
 render(<App />, document.getElementById("app")!);
+registerServiceWorker();

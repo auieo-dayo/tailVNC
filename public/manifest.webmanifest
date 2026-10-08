@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "TailVNC",
+  "short_name": "TailVNC",
+  "description": "Tailscale経由でtailnet内のVNC端末へ接続するブラウザクライアント",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#edf2ee",
+  "theme_color": "#edf2ee",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
