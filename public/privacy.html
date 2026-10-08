@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#edf2ee" />
+    <title>プライバシーポリシー | TailVNC</title>
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <main class="legal-page">
+      <header class="legal-header">
+        <a class="legal-brand" href="/" target="_blank" rel="noopener noreferrer">tail<span>VNC</span></a>
+        <a class="back-link" href="/" target="_blank" rel="noopener noreferrer">TailVNCを開く</a>
+      </header>
+
+      <article>
+        <p class="eyebrow">LEGAL / PRIVACY</p>
+        <h1>プライバシーポリシー</h1>
+        <p class="updated">制定日: 2026年10月8日</p>
+        <p class="lead">このポリシーはTailVNCブラウザクライアントにおける情報の扱いを説明します。TailVNCはブラウザ内で動作し、TailVNC独自のアカウントサーバーやVNC中継サーバーは運用しません。</p>
+
+        <section>
+          <h2>1. 取得・保存する情報</h2>
+          <ul>
+            <li><strong>Tailscaleクライアント状態:</strong> ログインと接続状態を維持するため、Tailscale WASMクライアントの状態をブラウザのsessionStorageに保存します。タブのセッションが終了すると通常は破棄されます。共有端末では利用後にログアウトし、必要に応じてサイトデータを消去してください。</li>
+            <li><strong>接続情報:</strong> 選択したtailnet peer、IPアドレス、VNCポート、画質設定を接続中のブラウザメモリで扱います。画質設定のみ、このタブのsessionStorageに保存します。</li>
+            <li><strong>VNCパスワード:</strong> 入力されたパスワードは接続・認証のためブラウザメモリ上で扱い、TailVNC独自のsessionStorageやサーバーには保存しません。認証時には選択したVNC peerへ送信されます。</li>
+            <li><strong>障害診断情報:</strong> 接続失敗時、peer名、ポート、受信バイト数、先頭の応答データを画面とブラウザコンソールに表示する場合があります。コンソールログを第三者へ共有する際は、接続先などが含まれていないか確認してください。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>2. Tailscaleおよび通信先による処理</h2>
+          <p>ログイン、tailnet peer一覧、通信経路の確立にはTailscaleのクライアントとサービスを利用します。Tailscale側では、サービス提供に必要な端末名、ホスト名、IPアドレス、公開鍵、接続メタデータ、診断ログ等を処理する場合があります。またクライアントの運用ログ・診断情報がTailscaleのログサービスへ送信される場合があります。収集項目、利用目的、保持期間、権利行使は<a href="https://tailscale.com/privacy-policy" target="_blank" rel="noopener noreferrer">Tailscaleプライバシーポリシー</a>を確認してください。</p>
+          <p>TailVNCはVNC通信をTailscale経由でpeerへ直接送ります。TailVNC独自の通信中継はありません。Tailscaleはtailnet通信の内容をエンドツーエンド暗号化すると説明していますが、ブラウザ端末、接続先VNCサーバー、VNC認証方式の安全性は利用者側で管理してください。</p>
+        </section>
+
+        <section>
+          <h2>3. Cookie、解析、ホスティング</h2>
+          <p>TailVNCクライアントは、独自の広告Cookieやアクセス解析SDKを使用しません。ただし、このページを配信するホスティング事業者がアクセスログ等を処理することがあります。その取扱いは、TailVNCを実際にホストする個人・組織のポリシーも確認してください。</p>
+        </section>
+
+        <section>
+          <h2>4. 管理と問い合わせ</h2>
+          <p>TailVNCをセルフホストする環境では、ホスティング事業者の設定によりアクセスログ等が記録される場合があります。Tailscaleアカウントやtailnetデータに関する問い合わせは、tailnet管理者またはTailscaleへお願いします。</p>
+        </section>
+
+        <section>
+          <h2>5. 改定</h2>
+          <p>配布者は、適用法令やアプリの情報処理方法に変更があった場合、このポリシーを改定し、改定日を更新します。</p>
+        </section>
+
+      </article>
+
+      <footer class="legal-footer">
+        <a href="/terms.html">利用規約</a>
+        <span>TailVNC</span>
+      </footer>
+    </main>
+  </body>
+</html>

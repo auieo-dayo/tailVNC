@@ -1,0 +1,25 @@
+{
+  "name": "tailvnc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:wasm && vite --host 0.0.0.0",
+    "build": "npm run build:wasm && npm run typecheck && vite build",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@novnc/novnc": "1.7.0",
+    "@fontsource/ibm-plex-mono": "^5.2.6",
+    "@fontsource/ibm-plex-sans": "^5.2.6",
+    "lucide-preact": "^0.468.0",
+    "preact": "^10.27.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "vitest": "^5.0.3"
+  }
+}

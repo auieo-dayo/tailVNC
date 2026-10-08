@@ -1,0 +1,6 @@
+node_modules/
+dist/
+public/tailscale.wasm
+public/wasm_exec.js
+public/licenses/
+*.log

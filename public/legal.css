@@ -1,0 +1,62 @@
+:root {
+  color: #24332b;
+  background: #edf2ee;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: #24332b;
+  --muted: #748178;
+  --line: #dce5de;
+  --green: #17684b;
+  --paper: #fbfcfa;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 94% 0%, rgba(234, 184, 127, .13), transparent 30rem),
+    linear-gradient(135deg, #f3f6f2, #eaf0eb 58%, #f1f1e9);
+}
+
+a { color: var(--green); text-underline-offset: 3px; }
+a:hover { color: #124d38; }
+
+.legal-page { width: min(100% - 32px, 820px); margin: 0 auto; }
+.legal-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+.legal-brand { color: var(--ink); font-size: 17px; font-weight: 700; text-decoration: none; }
+.legal-brand span { color: var(--green); }
+.back-link { font-size: 12px; text-decoration: none; }
+
+article { padding: 44px 0 52px; }
+.eyebrow { margin: 0 0 8px; color: #87948b; font-family: monospace; font-size: 10px; letter-spacing: 1px; }
+h1 { margin: 0; color: var(--ink); font-size: 30px; font-weight: 650; }
+.updated { margin: 10px 0 24px; color: var(--muted); font-size: 12px; }
+.lead { margin: 0 0 34px; color: #4f6056; font-size: 15px; line-height: 1.9; }
+section { margin-top: 28px; }
+h2 { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: #31473a; font-size: 17px; font-weight: 600; }
+p, li { color: #536158; font-size: 14px; line-height: 1.9; }
+p { margin: 0 0 12px; }
+ul { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+li strong { color: #36483d; }
+.operator-note { margin-top: 34px; padding: 14px 16px; border-left: 3px solid #d99847; color: #78664c; background: rgba(255, 250, 241, .9); font-size: 12px; line-height: 1.8; }
+.operator-note strong { color: #5a4930; }
+.legal-footer { display: flex; justify-content: space-between; padding: 16px 0 26px; border-top: 1px solid var(--line); color: #839087; font-size: 11px; }
+.legal-footer a { text-decoration: none; }
+
+@media (max-width: 600px) {
+  .legal-header { height: 56px; }
+  article { padding-top: 30px; }
+  h1 { font-size: 25px; }
+  .lead { font-size: 14px; }
+  p, li { font-size: 13px; }
+}
