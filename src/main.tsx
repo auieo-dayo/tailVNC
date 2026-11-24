@@ -29,6 +29,13 @@ import {
   type ScreenRfb,
   type ScreenState,
 } from "./lib/novnc-screens";
+import {
+  createUltraVncMonitorController,
+  isUltraVncDesktopName,
+  type UltraVncMonitorController,
+  type UltraVncMonitorState,
+  type UltraVncRfb,
+} from "./lib/ultravnc-monitors";
 
 function registerServiceWorker() {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
@@ -57,11 +64,17 @@ function App() {
     screens: [],
     selectedId: null,
   });
+  const [ultraVncState, setUltraVncState] = useState<UltraVncMonitorState>({
+    count: 0,
+    current: null,
+  });
+  const [vncDesktopName, setVncDesktopName] = useState("");
   const clientRef = useRef<Awaited<ReturnType<typeof createTailnetClient>> | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const viewerStageRef = useRef<HTMLElement>(null);
   const rfbRef = useRef<RFB | null>(null);
   const screenControllerRef = useRef<ScreenController | null>(null);
+  const ultraVncControllerRef = useRef<UltraVncMonitorController | null>(null);
   const connected = connectionState === "connected";
   const waitingForCredentials = connectionState === "waiting-credentials";
   const onlinePeers = peers.filter((peer) => peer.online !== false);
@@ -70,6 +83,21 @@ function App() {
   const selectedScreenId = screenState.selectedId;
   const selectedScreenIndex = screens.findIndex((screen) => screen.id === selectedScreenId);
   const showScreenSwitch = connected && screens.length > 1;
+  const showUltraVncSwitch =
+    connected && screens.length <= 1 && ultraVncState.count > 1;
+  const showUltraVncCycle =
+    connected &&
+    screens.length <= 1 &&
+    ultraVncState.count === 0 &&
+    isUltraVncDesktopName(vncDesktopName);
+  const activeDisplayIndex =
+    screens.length > 1
+      ? selectedScreenIndex >= 0
+        ? selectedScreenIndex
+        : null
+      : ultraVncState.count > 1
+        ? ultraVncState.current
+        : null;
 
   useEffect(() => {
     let active = true;
@@ -109,8 +137,7 @@ function App() {
 
     return () => {
       active = false;
-      screenControllerRef.current?.dispose();
-      screenControllerRef.current = null;
+      disposeDisplayControllers();
       const rfb = rfbRef.current;
       rfbRef.current = null;
       rfb?.disconnect();
@@ -124,6 +151,19 @@ function App() {
     document.addEventListener("fullscreenchange", syncFullscreen);
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
+
+  function disposeDisplayControllers() {
+    ultraVncControllerRef.current?.dispose();
+    ultraVncControllerRef.current = null;
+    screenControllerRef.current?.dispose();
+    screenControllerRef.current = null;
+  }
+
+  function resetDisplayState() {
+    setScreenState({ screens: [], selectedId: null });
+    setUltraVncState({ count: 0, current: null });
+    setVncDesktopName("");
+  }
 
   async function connect() {
     if (waitingForCredentials) {
@@ -144,9 +184,8 @@ function App() {
 
     setError("");
     setConnectionState("connecting");
-    screenControllerRef.current?.dispose();
-    screenControllerRef.current = null;
-    setScreenState({ screens: [], selectedId: null });
+    disposeDisplayControllers();
+    resetDisplayState();
     const previousRfb = rfbRef.current;
     rfbRef.current = null;
 
@@ -175,10 +214,24 @@ function App() {
           }
         },
       );
+      ultraVncControllerRef.current = createUltraVncMonitorController(
+        rfb as unknown as UltraVncRfb,
+        (next) => {
+          if (rfbRef.current === rfb) {
+            setUltraVncState(next);
+          }
+        },
+      );
       rfb.scaleViewport = true;
       rfb.clipViewport = true;
       rfb.focusOnClick = true;
       rfb.qualityLevel = qualityLevel;
+      rfb.addEventListener("desktopname", (event) => {
+        const name = (event as CustomEvent<{ name: string }>).detail?.name ?? "";
+        if (rfbRef.current === rfb) {
+          setVncDesktopName(name);
+        }
+      });
       let handshakeComplete = false;
       rfb.addEventListener("connect", () => {
         handshakeComplete = true;
@@ -207,10 +260,9 @@ function App() {
         if (!isCurrent) {
           return;
         }
-        screenControllerRef.current?.dispose();
-        screenControllerRef.current = null;
+        disposeDisplayControllers();
         rfbRef.current = null;
-        setScreenState({ screens: [], selectedId: null });
+        resetDisplayState();
         setConnectionState("idle");
       });
       rfb.addEventListener("credentialsrequired", () => {
@@ -224,10 +276,9 @@ function App() {
       });
     } catch (reason) {
       if (createdRfb && rfbRef.current === createdRfb) {
-        screenControllerRef.current?.dispose();
-        screenControllerRef.current = null;
+        disposeDisplayControllers();
         rfbRef.current = null;
-        setScreenState({ screens: [], selectedId: null });
+        resetDisplayState();
       }
       createdRfb?.disconnect();
       setConnectionState("idle");
@@ -238,9 +289,8 @@ function App() {
   function disconnect() {
     const rfb = rfbRef.current;
     rfbRef.current = null;
-    screenControllerRef.current?.dispose();
-    screenControllerRef.current = null;
-    setScreenState({ screens: [], selectedId: null });
+    disposeDisplayControllers();
+    resetDisplayState();
     rfb?.disconnect();
     setConnectionState("idle");
   }
@@ -431,7 +481,7 @@ function App() {
                 <span class="viewer-separator">/</span>
                 <span class="viewer-subtitle">
                   {connected
-                    ? `${selected?.addresses[0]}:${port}${selectedScreenIndex >= 0 ? ` · ディスプレイ ${selectedScreenIndex + 1}` : ""}`
+                    ? `${selected?.addresses[0]}:${port}${activeDisplayIndex !== null ? ` · ディスプレイ ${activeDisplayIndex + 1}` : ""}`
                     : "リモートデスクトップ"}
                 </span>
               </div>
@@ -470,6 +520,47 @@ function App() {
                         {index + 1}
                       </button>
                     ))}
+                  </div>
+                )}
+                {showUltraVncSwitch && (
+                  <div class="display-switch" role="group" aria-label="ディスプレイ切替">
+                    <span class="display-switch-icon" aria-hidden="true">
+                      <Monitor size={14} />
+                    </span>
+                    {Array.from({ length: ultraVncState.count }, (_, index) => (
+                      <button
+                        type="button"
+                        key={index}
+                        class={ultraVncState.current === index ? "is-active" : ""}
+                        aria-label={`ディスプレイ ${index + 1}`}
+                        aria-pressed={ultraVncState.current === index}
+                        title={`ディスプレイ ${index + 1}`}
+                        onClick={() => {
+                          ultraVncControllerRef.current?.select(index);
+                          rfbRef.current?.focus({ preventScroll: true });
+                        }}
+                      >
+                        {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showUltraVncCycle && (
+                  <div class="display-switch" role="group" aria-label="ディスプレイ切替">
+                    <span class="display-switch-icon" aria-hidden="true">
+                      <Monitor size={14} />
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="表示モニターを切り替え"
+                      title="UltraVNCの表示モニターを切り替え"
+                      onClick={() => {
+                        ultraVncControllerRef.current?.cycle();
+                        rfbRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      切替
+                    </button>
                   </div>
                 )}
                 <label class="quality-control">

@@ -41,11 +41,14 @@ npm run build
 
 VNCサーバーがRFBのExtended Desktop Sizeで複数スクリーンを公開している場合、接続後にビューア上部へ「全 / 1 / 2 …」の切替が表示されます。選択したスクリーンだけを拡大表示します。
 
-- 切替はクライアント側の表示範囲変更です。VNCの通信量は全体表示のままです。
-- Windows/macOSなど、複数モニターを1枚の合成デスクトップとして公開するサーバーでは切替は表示されません。
-- 切替が表示されない場合は、開発者ツールのコンソールで `[TailVNC] VNC screen layout (N)` を確認してください。Nが1以下の場合、サーバーは複数スクリーンを通知していません。
+UltraVNCの場合は、UltraVNC独自のモニター切替拡張にも対応します。接続後に「1 / 2 …」が表示され、押したモニターをサーバーが配信します。切替時はサーバーがフレームバッファサイズを変更することがあります。
+
+- Extended Desktop Size方式の切替はクライアント側の表示範囲変更です。VNCの通信量は全体表示のままです。UltraVNC方式はサーバーが選択したモニターを配信します。
+- Windows/macOSなど、複数モニターを1枚の合成デスクトップとして公開するサーバーでは切替が表示されないことがあります。
+- 切替が表示されない場合は、開発者ツールのコンソールで `[TailVNC] UltraVNC monitor info requested`、`[TailVNC] VNC screen layout (N)`、`[TailVNC] UltraVNC monitors: N` を確認してください。`requested` が出ていればUltraVNCへ問い合わせ済みです。`monitors: N` のNが1以下の場合、サーバーは複数モニターを通知していません。
+- UltraVNCのモニター切替拡張に対応していない古いUltraVNCでは、デスクトップ名がUltraVNC形式（`... - service mode` / `... - application mode`）の場合に「切替」ボタンを表示し、モニターを順送りします。
 - 非対応の場合は、サーバー側のマルチスクリーン設定や、ディスプレイ番号ごとの別VNCサーバーをご利用ください。
-- 本機能はnoVNC 1.7.0の内部APIを利用しています。noVNC更新時は `src/lib/novnc-screens.ts` とテストを確認してください。
+- 本機能はnoVNC 1.7.0の内部APIを利用しています。noVNC更新時は `src/lib/novnc-screens.ts`、`src/lib/ultravnc-monitors.ts` とテストを確認してください。
 
 ## 接続構成
 
