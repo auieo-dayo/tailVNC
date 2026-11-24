@@ -23,6 +23,12 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "./style.css";
 import { createTailnetClient, type TailnetPeer, type TailnetState } from "./lib/tailscale";
 import { TailscaleVncChannel } from "./lib/tailscale-vnc-channel";
+import {
+  createScreenController,
+  type ScreenController,
+  type ScreenRfb,
+  type ScreenState,
+} from "./lib/novnc-screens";
 
 function registerServiceWorker() {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
@@ -47,14 +53,23 @@ function App() {
     const stored = Number(sessionStorage.getItem("tailvnc:quality"));
     return [3, 6, 9].includes(stored) ? stored : 6;
   });
+  const [screenState, setScreenState] = useState<ScreenState>({
+    screens: [],
+    selectedId: null,
+  });
   const clientRef = useRef<Awaited<ReturnType<typeof createTailnetClient>> | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const viewerStageRef = useRef<HTMLElement>(null);
   const rfbRef = useRef<RFB | null>(null);
+  const screenControllerRef = useRef<ScreenController | null>(null);
   const connected = connectionState === "connected";
   const waitingForCredentials = connectionState === "waiting-credentials";
   const onlinePeers = peers.filter((peer) => peer.online !== false);
   const selected = peers.find((peer) => peer.name === selectedPeer);
+  const screens = screenState.screens;
+  const selectedScreenId = screenState.selectedId;
+  const selectedScreenIndex = screens.findIndex((screen) => screen.id === selectedScreenId);
+  const showScreenSwitch = connected && screens.length > 1;
 
   useEffect(() => {
     let active = true;
@@ -94,7 +109,11 @@ function App() {
 
     return () => {
       active = false;
-      rfbRef.current?.disconnect();
+      screenControllerRef.current?.dispose();
+      screenControllerRef.current = null;
+      const rfb = rfbRef.current;
+      rfbRef.current = null;
+      rfb?.disconnect();
     };
   }, []);
 
@@ -125,13 +144,37 @@ function App() {
 
     setError("");
     setConnectionState("connecting");
+    screenControllerRef.current?.dispose();
+    screenControllerRef.current = null;
+    setScreenState({ screens: [], selectedId: null });
+    const previousRfb = rfbRef.current;
+    rfbRef.current = null;
+
+    let createdRfb: RFB | null = null;
     try {
+      previousRfb?.disconnect();
       const stream = await client.openTCP(target.name, port);
       const channel = new TailscaleVncChannel(stream);
       const rfb = new RFB(viewer, channel as unknown as RTCDataChannel, {
         credentials: password ? { password } : {},
         shared: true,
       });
+      createdRfb = rfb;
+      rfbRef.current = rfb;
+      screenControllerRef.current = createScreenController(
+        rfb as unknown as ScreenRfb,
+        () => {
+          const element = viewerRef.current;
+          if (!element) return { width: 0, height: 0 };
+          const rect = element.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        },
+        (next) => {
+          if (rfbRef.current === rfb) {
+            setScreenState(next);
+          }
+        },
+      );
       rfb.scaleViewport = true;
       rfb.clipViewport = true;
       rfb.focusOnClick = true;
@@ -139,9 +182,12 @@ function App() {
       let handshakeComplete = false;
       rfb.addEventListener("connect", () => {
         handshakeComplete = true;
-        setConnectionState("connected");
+        if (rfbRef.current === rfb) {
+          setConnectionState("connected");
+        }
       }, { once: true });
       rfb.addEventListener("disconnect", (event) => {
+        const isCurrent = rfbRef.current === rfb;
         const clean = (event as CustomEvent<{ clean: boolean }>).detail?.clean;
         if (!clean && !handshakeComplete) {
           const { receivedBytes, initialBytes } = channel.diagnostics;
@@ -154,28 +200,48 @@ function App() {
             receivedBytes,
             initialBytes,
           });
-          setError(`VNCハンドシェイク前に切断 (${receivedBytes} bytes受信、${banner})。${target.name.split(".")[0]}:${port}への接続を確認してください。`);
+          if (isCurrent) {
+            setError(`VNCハンドシェイク前に切断 (${receivedBytes} bytes受信、${banner})。${target.name.split(".")[0]}:${port}への接続を確認してください。`);
+          }
         }
-        setConnectionState("idle");
+        if (!isCurrent) {
+          return;
+        }
+        screenControllerRef.current?.dispose();
+        screenControllerRef.current = null;
         rfbRef.current = null;
+        setScreenState({ screens: [], selectedId: null });
+        setConnectionState("idle");
       });
       rfb.addEventListener("credentialsrequired", () => {
+        if (rfbRef.current !== rfb) return;
         setConnectionState("waiting-credentials");
         setError("VNCパスワードを入力して認証してください");
       });
       rfb.addEventListener("securityfailure", () => {
+        if (rfbRef.current !== rfb) return;
         setError("VNC認証に失敗しました");
       });
-      rfbRef.current = rfb;
     } catch (reason) {
+      if (createdRfb && rfbRef.current === createdRfb) {
+        screenControllerRef.current?.dispose();
+        screenControllerRef.current = null;
+        rfbRef.current = null;
+        setScreenState({ screens: [], selectedId: null });
+      }
+      createdRfb?.disconnect();
       setConnectionState("idle");
       setError(reason instanceof Error ? reason.message : String(reason));
     }
   }
 
   function disconnect() {
-    rfbRef.current?.disconnect();
+    const rfb = rfbRef.current;
     rfbRef.current = null;
+    screenControllerRef.current?.dispose();
+    screenControllerRef.current = null;
+    setScreenState({ screens: [], selectedId: null });
+    rfb?.disconnect();
     setConnectionState("idle");
   }
 
@@ -363,9 +429,49 @@ function App() {
                 <span class="viewer-live-dot" />
                 <strong>{connected ? selected?.name.split(".")[0] : "VNCセッション"}</strong>
                 <span class="viewer-separator">/</span>
-                <span class="viewer-subtitle">{connected ? `${selected?.addresses[0]}:${port}` : "リモートデスクトップ"}</span>
+                <span class="viewer-subtitle">
+                  {connected
+                    ? `${selected?.addresses[0]}:${port}${selectedScreenIndex >= 0 ? ` · ディスプレイ ${selectedScreenIndex + 1}` : ""}`
+                    : "リモートデスクトップ"}
+                </span>
               </div>
               <div class="viewer-actions">
+                {showScreenSwitch && (
+                  <div class="display-switch" role="group" aria-label="ディスプレイ切替">
+                    <span class="display-switch-icon" aria-hidden="true">
+                      <Monitor size={14} />
+                    </span>
+                    <button
+                      type="button"
+                      class={selectedScreenId === null ? "is-active" : ""}
+                      aria-label="すべてのディスプレイを表示"
+                      aria-pressed={selectedScreenId === null}
+                      title="すべてのディスプレイを表示"
+                      onClick={() => {
+                        screenControllerRef.current?.select(null);
+                        rfbRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      全
+                    </button>
+                    {screens.map((screen, index) => (
+                      <button
+                        type="button"
+                        key={screen.id}
+                        class={selectedScreenId === screen.id ? "is-active" : ""}
+                        aria-label={`ディスプレイ ${index + 1}`}
+                        aria-pressed={selectedScreenId === screen.id}
+                        title={`ディスプレイ ${index + 1}（${screen.width}×${screen.height}）`}
+                        onClick={() => {
+                          screenControllerRef.current?.select(screen.id);
+                          rfbRef.current?.focus({ preventScroll: true });
+                        }}
+                      >
+                        {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <label class="quality-control">
                   <span>画質</span>
                   <select

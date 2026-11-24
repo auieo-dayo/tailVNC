@@ -16,6 +16,7 @@ declare module "@novnc/novnc" {
     focusOnClick: boolean;
     qualityLevel: number;
     disconnect(): void;
+    focus(options?: FocusOptions): void;
     sendCredentials(credentials: Credentials): void;
   }
 }

@@ -37,6 +37,16 @@ npm run build
 
 第三者コードとフォントの主なライセンス、再配布時の注意は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。ビルドはWASMに含まれるGoモジュールと実行時npm依存のライセンス原文を `dist/licenses/` に生成します。配布時はこのディレクトリを削除・除外しないでください。
 
+## 複数ディスプレイ
+
+VNCサーバーがRFBのExtended Desktop Sizeで複数スクリーンを公開している場合、接続後にビューア上部へ「全 / 1 / 2 …」の切替が表示されます。選択したスクリーンだけを拡大表示します。
+
+- 切替はクライアント側の表示範囲変更です。VNCの通信量は全体表示のままです。
+- Windows/macOSなど、複数モニターを1枚の合成デスクトップとして公開するサーバーでは切替は表示されません。
+- 切替が表示されない場合は、開発者ツールのコンソールで `[TailVNC] VNC screen layout (N)` を確認してください。Nが1以下の場合、サーバーは複数スクリーンを通知していません。
+- 非対応の場合は、サーバー側のマルチスクリーン設定や、ディスプレイ番号ごとの別VNCサーバーをご利用ください。
+- 本機能はnoVNC 1.7.0の内部APIを利用しています。noVNC更新時は `src/lib/novnc-screens.ts` とテストを確認してください。
+
 ## 接続構成
 
 `cmd/tailvnc-wasm/main_js.go` はTailscale v1.102.3のブラウザWASMクライアントを基にし、認証済みtailnet peerに限定した `openTCP(host, port)` を公開します。noVNCのraw channel形式へ変換してRFBプロトコルを運びます。独自チャネル接続はnoVNCの公式型保証外のため、noVNCバージョンを固定しています。
