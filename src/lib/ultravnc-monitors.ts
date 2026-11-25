@@ -52,14 +52,23 @@ type UltraVncSocket = {
   flush(): void;
 };
 
+type UltraVncDisplay = {
+  clipViewport: boolean;
+  readonly _viewportLoc: { x: number; y: number; w: number; h: number };
+  viewportChangeSize(width: number, height: number): void;
+  viewportChangePos(deltaX: number, deltaY: number): void;
+};
+
 export type UltraVncRfb = {
   constructor?: RfbConstructor;
   _sock?: UltraVncSocket;
+  _display?: UltraVncDisplay;
   _FBU?: { rects: number };
   _fbWidth?: number;
   _fbHeight?: number;
   _normalMsg?: () => boolean;
   _resize?: (width: number, height: number) => void;
+  _updateScale?: () => void;
 };
 
 export const RFB_ENCODING_MONITOR_INFO = 0xffff8005 | 0;
@@ -241,11 +250,29 @@ export function createUltraVncMonitorController(
     return originalNormalMsg ? originalNormalMsg.call(rfb) : false;
   }
 
+  function resetDisplayViewport(width: number, height: number): void {
+    const display = rfb._display;
+    if (!display) {
+      return;
+    }
+
+    try {
+      display.clipViewport = true;
+      display.viewportChangeSize(width, height);
+      const viewport = display._viewportLoc;
+      display.viewportChangePos(-viewport.x, -viewport.y);
+      rfb._updateScale?.call(rfb);
+    } catch (error) {
+      console.warn("TailVNC could not reset the UltraVNC viewport", error);
+    }
+  }
+
   function handleResize(width: number, height: number): void {
     if (originalResize) {
       originalResize.call(rfb, width, height);
     }
     if (!disposed && monitorInfoSeen) {
+      resetDisplayViewport(width, height);
       scheduleFullUpdate(RESIZE_REFRESH_DELAY_MS);
     }
   }
@@ -304,6 +331,7 @@ export function createUltraVncMonitorController(
       current = index;
       all = false;
       emit();
+      resetDisplayViewport(rfb._fbWidth ?? 0, rfb._fbHeight ?? 0);
       requestFullUpdate();
       scheduleFullUpdate(SWITCH_REFRESH_DELAY_MS);
     },
@@ -325,6 +353,7 @@ export function createUltraVncMonitorController(
       current = null;
       all = true;
       emit();
+      resetDisplayViewport(rfb._fbWidth ?? 0, rfb._fbHeight ?? 0);
       requestFullUpdate();
       scheduleFullUpdate(SWITCH_REFRESH_DELAY_MS);
     },

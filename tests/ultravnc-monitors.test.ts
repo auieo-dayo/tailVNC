@@ -29,6 +29,19 @@ function createFakeRfb() {
 
   const originalNormalMsg = vi.fn(() => true);
   const originalResize = vi.fn();
+  const display = {
+    clipViewport: false,
+    _viewportLoc: { x: 1920, y: 0, w: 1920, h: 1080 },
+    viewportChangeSize: vi.fn((width: number, height: number) => {
+      display._viewportLoc.w = width;
+      display._viewportLoc.h = height;
+    }),
+    viewportChangePos: vi.fn((deltaX: number, deltaY: number) => {
+      display._viewportLoc.x += deltaX;
+      display._viewportLoc.y += deltaY;
+    }),
+  };
+  const updateScale = vi.fn();
   const clientEncodings = vi.fn(
     (_socket: unknown, _encodings: number[]) => {},
   );
@@ -36,17 +49,21 @@ function createFakeRfb() {
   const rfb = {
     constructor: { messages },
     _sock: sock,
+    _display: display,
     _FBU: { rects: 0 },
     _fbWidth: 1920,
     _fbHeight: 1080,
     _normalMsg: originalNormalMsg,
     _resize: originalResize,
+    _updateScale: updateScale,
   } as unknown as UltraVncRfb;
 
   return {
     rfb,
     messages,
     sock,
+    display,
+    updateScale,
     queue,
     pushed8,
     pushed16,
@@ -246,6 +263,22 @@ describe("createUltraVncMonitorController", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(fake.pushed8).toEqual([]);
     expect(fake.sock.flush).not.toHaveBeenCalled();
+
+    controller.dispose();
+  });
+
+  it("resets the viewport after a monitor desktop resize", () => {
+    const fake = createFakeRfb();
+    const controller = createUltraVncMonitorController(fake.rfb, vi.fn());
+
+    fake.queue.push(252, 2, 0, 0);
+    fake.rfb._normalMsg?.();
+    fake.rfb._resize?.(1920, 1080);
+
+    expect(fake.display.clipViewport).toBe(true);
+    expect(fake.display._viewportLoc.x).toBe(0);
+    expect(fake.display._viewportLoc.y).toBe(0);
+    expect(fake.updateScale).toHaveBeenCalledOnce();
 
     controller.dispose();
   });
