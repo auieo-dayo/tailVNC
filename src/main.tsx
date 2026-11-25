@@ -67,6 +67,7 @@ function App() {
   const [ultraVncState, setUltraVncState] = useState<UltraVncMonitorState>({
     count: 0,
     current: null,
+    all: null,
   });
   const [vncDesktopName, setVncDesktopName] = useState("");
   const clientRef = useRef<Awaited<ReturnType<typeof createTailnetClient>> | null>(null);
@@ -95,9 +96,13 @@ function App() {
       ? selectedScreenIndex >= 0
         ? selectedScreenIndex
         : null
-      : ultraVncState.count > 1
+      : ultraVncState.all === false
         ? ultraVncState.current
         : null;
+  const showingAllDisplays =
+    screens.length > 1
+      ? selectedScreenId === null
+      : ultraVncState.all === true;
 
   useEffect(() => {
     let active = true;
@@ -161,7 +166,7 @@ function App() {
 
   function resetDisplayState() {
     setScreenState({ screens: [], selectedId: null });
-    setUltraVncState({ count: 0, current: null });
+    setUltraVncState({ count: 0, current: null, all: null });
     setVncDesktopName("");
   }
 
@@ -481,7 +486,13 @@ function App() {
                 <span class="viewer-separator">/</span>
                 <span class="viewer-subtitle">
                   {connected
-                    ? `${selected?.addresses[0]}:${port}${activeDisplayIndex !== null ? ` · ディスプレイ ${activeDisplayIndex + 1}` : ""}`
+                    ? `${selected?.addresses[0]}:${port}${
+                        activeDisplayIndex !== null
+                          ? ` · ディスプレイ ${activeDisplayIndex + 1}`
+                          : showingAllDisplays
+                            ? " · 全ディスプレイ"
+                            : ""
+                      }`
                     : "リモートデスクトップ"}
                 </span>
               </div>
@@ -527,13 +538,34 @@ function App() {
                     <span class="display-switch-icon" aria-hidden="true">
                       <Monitor size={14} />
                     </span>
+                    <button
+                      type="button"
+                      class={ultraVncState.all === true ? "is-active" : ""}
+                      aria-label="すべてのディスプレイを表示"
+                      aria-pressed={ultraVncState.all === true}
+                      title="すべてのディスプレイを表示"
+                      onClick={() => {
+                        ultraVncControllerRef.current?.selectAll();
+                        rfbRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      全
+                    </button>
                     {Array.from({ length: ultraVncState.count }, (_, index) => (
                       <button
                         type="button"
                         key={index}
-                        class={ultraVncState.current === index ? "is-active" : ""}
+                        class={
+                          ultraVncState.all === false &&
+                          ultraVncState.current === index
+                            ? "is-active"
+                            : ""
+                        }
                         aria-label={`ディスプレイ ${index + 1}`}
-                        aria-pressed={ultraVncState.current === index}
+                        aria-pressed={
+                          ultraVncState.all === false &&
+                          ultraVncState.current === index
+                        }
                         title={`ディスプレイ ${index + 1}`}
                         onClick={() => {
                           ultraVncControllerRef.current?.select(index);

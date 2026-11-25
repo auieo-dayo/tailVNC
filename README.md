@@ -41,9 +41,10 @@ npm run build
 
 VNCサーバーがRFBのExtended Desktop Sizeで複数スクリーンを公開している場合、接続後にビューア上部へ「全 / 1 / 2 …」の切替が表示されます。選択したスクリーンだけを拡大表示します。
 
-UltraVNCの場合は、UltraVNC独自のモニター切替拡張にも対応します。接続後に「1 / 2 …」が表示され、押したモニターをサーバーが配信します。切替時はサーバーがフレームバッファサイズを変更することがあります。
+UltraVNCの場合は、UltraVNC独自のモニター切替拡張にも対応します。接続後に「全 / 1 / 2 …」が表示され、押したモニターをサーバーが配信します。「全」で全モニターの合成表示に戻せます。切替時はサーバーがフレームバッファサイズを変更することがあります。
 
 - Extended Desktop Size方式の切替はクライアント側の表示範囲変更です。VNCの通信量は全体表示のままです。UltraVNC方式はサーバーが選択したモニターを配信します。
+- UltraVNCが「全モニター表示」のときは、モニター番号の指定だけでは表示が変わりません。そのため切替時はUltraVNCのモニター送り命令（SetSW）で全表示モードを抜けてから対象モニターを指定します（ネイティブビューアの「Switch monitor」と同じ命令です）。
 - Windows/macOSなど、複数モニターを1枚の合成デスクトップとして公開するサーバーでは切替が表示されないことがあります。
 - 切替が表示されない場合は、開発者ツールのコンソールで `[TailVNC] UltraVNC monitor info requested`、`[TailVNC] VNC screen layout (N)`、`[TailVNC] UltraVNC monitors: N` を確認してください。`requested` が出ていればUltraVNCへ問い合わせ済みです。`monitors: N` のNが1以下の場合、サーバーは複数モニターを通知していません。
 - UltraVNCのモニター切替拡張に対応していない古いUltraVNCでは、デスクトップ名がUltraVNC形式（`... - service mode` / `... - application mode`）の場合に「切替」ボタンを表示し、モニターを順送りします。

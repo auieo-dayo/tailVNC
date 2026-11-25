@@ -5,6 +5,10 @@
  *   - pseudo-encoding 0xFFFF8005 (rfbEncodingMonitorInfo) requests the count
  *   - server message 252 (rfbMonitorInfo): type, count, padding, padding
  *   - client message 254 (rfbSetMonitor): type, index, padding, padding
+ *   - client message 10 (rfbSetSW): cycles 0, 1, ... n-1, all monitors
+ *
+ * rfbSetMonitor alone cannot leave UltraVNC's "all monitors" mode, so this
+ * module cycles out of it before selecting a monitor.
  *
  * noVNC 1.7.0 does not know these extensions. This module adds the encoding
  * to SetEncodings and consumes message 252 before noVNC rejects it.
@@ -16,10 +20,12 @@
 export type UltraVncMonitorState = {
   count: number;
   current: number | null;
+  all: boolean | null;
 };
 
 export type UltraVncMonitorController = {
   select(index: number): void;
+  selectAll(): void;
   cycle(): void;
   dispose(): void;
 };
@@ -118,6 +124,7 @@ export function createUltraVncMonitorController(
 ): UltraVncMonitorController {
   let count = 0;
   let current: number | null = null;
+  let all: boolean | null = null;
   let monitorInfoSeen = false;
   let disposed = false;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -139,8 +146,28 @@ export function createUltraVncMonitorController(
 
   function emit(): void {
     if (!disposed) {
-      onChange({ count, current });
+      onChange({ count, current, all });
     }
+  }
+
+  function pushSetSW(): void {
+    if (!sock) {
+      return;
+    }
+    sock.sQpush8(RFB_SET_SW);
+    sock.sQpush8(0);
+    sock.sQpush16(1);
+    sock.sQpush16(1);
+  }
+
+  function pushSetMonitor(index: number): void {
+    if (!sock) {
+      return;
+    }
+    sock.sQpush8(RFB_SET_MONITOR);
+    sock.sQpush8(index);
+    sock.sQpush8(0);
+    sock.sQpush8(0);
   }
 
   function requestFullUpdate(): void {
@@ -176,13 +203,12 @@ export function createUltraVncMonitorController(
   function setMonitorCount(nextCount: number): void {
     const normalized =
       Number.isFinite(nextCount) && nextCount > 0 ? Math.floor(nextCount) : 0;
-    const nextCurrent =
-      normalized > 0 && (current === null || current >= normalized) ? 0 : current;
     const changed =
-      count !== normalized || current !== nextCurrent || !monitorInfoSeen;
+      count !== normalized || !monitorInfoSeen;
 
     count = normalized;
-    current = nextCurrent;
+    current = null;
+    all = null;
     monitorInfoSeen = true;
 
     if (changed) {
@@ -238,10 +264,7 @@ export function createUltraVncMonitorController(
       }
 
       try {
-        sock.sQpush8(RFB_SET_SW);
-        sock.sQpush8(0);
-        sock.sQpush16(1);
-        sock.sQpush16(1);
+        pushSetSW();
         sock.flush();
       } catch (error) {
         console.warn("TailVNC could not cycle the UltraVNC monitor", error);
@@ -252,16 +275,26 @@ export function createUltraVncMonitorController(
       scheduleFullUpdate(SWITCH_REFRESH_DELAY_MS);
     },
 
+    /**
+     * Selecting a monitor needs two steps on UltraVNC. While "all monitors" is
+     * active, telling the server a monitor number only updates an internal
+     * index and the combined desktop stays on screen. SetSW is the only
+     * command that leaves that mode: it walks the ordered states
+     * 0, 1, ... n-1, all. So jump to n-1, step into "all", step once more to
+     * land on monitor 0 with all-monitors disabled, then pick the target.
+     */
     select(index: number): void {
       if (disposed || index < 0 || index >= count || !sock) {
         return;
       }
 
       try {
-        sock.sQpush8(RFB_SET_MONITOR);
-        sock.sQpush8(index);
-        sock.sQpush8(0);
-        sock.sQpush8(0);
+        if (all !== false) {
+          pushSetMonitor(count - 1);
+          pushSetSW();
+          pushSetSW();
+        }
+        pushSetMonitor(index);
         sock.flush();
       } catch (error) {
         console.warn("TailVNC could not switch the UltraVNC monitor", error);
@@ -269,6 +302,28 @@ export function createUltraVncMonitorController(
       }
 
       current = index;
+      all = false;
+      emit();
+      requestFullUpdate();
+      scheduleFullUpdate(SWITCH_REFRESH_DELAY_MS);
+    },
+
+    selectAll(): void {
+      if (disposed || count < 1 || !sock) {
+        return;
+      }
+
+      try {
+        pushSetMonitor(count - 1);
+        pushSetSW();
+        sock.flush();
+      } catch (error) {
+        console.warn("TailVNC could not show all UltraVNC monitors", error);
+        return;
+      }
+
+      current = null;
+      all = true;
       emit();
       requestFullUpdate();
       scheduleFullUpdate(SWITCH_REFRESH_DELAY_MS);
@@ -295,6 +350,7 @@ export function createUltraVncMonitorController(
       }
       count = 0;
       current = null;
+      all = null;
       monitorInfoSeen = false;
     },
   };

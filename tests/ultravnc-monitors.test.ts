@@ -96,7 +96,11 @@ describe("createUltraVncMonitorController", () => {
     expect(fake.rfb._normalMsg?.()).toBe(true);
     expect(fake.originalNormalMsg).not.toHaveBeenCalled();
     expect(fake.queue).toEqual([]);
-    expect(onChange).toHaveBeenLastCalledWith({ count: 2, current: 0 });
+    expect(onChange).toHaveBeenLastCalledWith({
+      count: 2,
+      current: null,
+      all: null,
+    });
 
     controller.dispose();
   });
@@ -114,7 +118,11 @@ describe("createUltraVncMonitorController", () => {
 
     fake.queue.push(0, 0);
     expect(fake.rfb._normalMsg?.()).toBe(true);
-    expect(onChange).toHaveBeenLastCalledWith({ count: 2, current: 0 });
+    expect(onChange).toHaveBeenLastCalledWith({
+      count: 2,
+      current: null,
+      all: null,
+    });
 
     controller.dispose();
   });
@@ -134,7 +142,7 @@ describe("createUltraVncMonitorController", () => {
     controller.dispose();
   });
 
-  it("sends the selected monitor and requests a full update", () => {
+  it("leaves all-monitors mode and selects a monitor", () => {
     const fake = createFakeRfb();
     const onChange = vi.fn();
     const controller = createUltraVncMonitorController(fake.rfb, onChange);
@@ -147,10 +155,60 @@ describe("createUltraVncMonitorController", () => {
 
     controller.select(1);
 
-    expect(onChange).toHaveBeenLastCalledWith({ count: 2, current: 1 });
-    expect(fake.pushed8).toEqual([254, 1, 0, 0, 3, 0]);
-    expect(fake.pushed16).toEqual([0, 0, 1920, 1080]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      count: 2,
+      current: 1,
+      all: false,
+    });
+    // last monitor -> all -> primary -> selected monitor
+    expect(fake.pushed8).toEqual([
+      254, 1, 0, 0, 10, 0, 10, 0, 254, 1, 0, 0, 3, 0,
+    ]);
+    expect(fake.pushed16).toEqual([1, 1, 1, 1, 0, 0, 1920, 1080]);
     expect(fake.sock.flush).toHaveBeenCalledTimes(2);
+
+    controller.dispose();
+  });
+
+  it("switches directly once a single monitor is known", () => {
+    const fake = createFakeRfb();
+    const controller = createUltraVncMonitorController(fake.rfb, vi.fn());
+
+    fake.queue.push(252, 2, 0, 0);
+    fake.rfb._normalMsg?.();
+    controller.select(1);
+    fake.pushed8.length = 0;
+    fake.pushed16.length = 0;
+    fake.sock.flush.mockClear();
+
+    controller.select(0);
+
+    expect(fake.pushed8).toEqual([254, 0, 0, 0, 3, 0]);
+    expect(fake.pushed16).toEqual([0, 0, 1920, 1080]);
+
+    controller.dispose();
+  });
+
+  it("shows all monitors", () => {
+    const fake = createFakeRfb();
+    const onChange = vi.fn();
+    const controller = createUltraVncMonitorController(fake.rfb, onChange);
+
+    fake.queue.push(252, 2, 0, 0);
+    fake.rfb._normalMsg?.();
+    fake.pushed8.length = 0;
+    fake.pushed16.length = 0;
+    fake.sock.flush.mockClear();
+
+    controller.selectAll();
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      count: 2,
+      current: null,
+      all: true,
+    });
+    expect(fake.pushed8).toEqual([254, 1, 0, 0, 10, 0, 3, 0]);
+    expect(fake.pushed16).toEqual([1, 1, 0, 0, 1920, 1080]);
 
     controller.dispose();
   });
